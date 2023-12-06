@@ -5,11 +5,12 @@ AWS.config.update({
     region:'sua-regiao'
 })
 
+const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const sqs = new AWS.SQS({ apiVersion: '2012-11-05' });
 
 class TransactionController {
     async createTransaction(req, res)  {
-     
+
         const{idempotencyId, amount, type} = req.body;
         const transactionBody = new Transaction(idempotencyId,amount,type);
 
@@ -20,6 +21,17 @@ class TransactionController {
 
         try {
             await sqs.sendMessage(params).promise();
+            const dynamoParams = {
+              TableName: "tabela-dynamodb",
+              Item: {
+                id: idempotencyId,
+                amount,
+                type,
+              },
+            };
+
+          await dynamoDB.put(dynamoParams).promise();
+
             res.status(201).json({message:'Transação recebida com sucesso!'})
         } catch (error) {
             console.error('Erro ao enviar mensagem para a fila SQS:', error);
